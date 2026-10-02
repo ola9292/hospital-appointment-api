@@ -1,6 +1,7 @@
 import User from '../db/models/User.js'
 import Appointment from '../db/models/Appointment.js'
 import appointmentService from '../services/appointmentService.js'
+import userTransformer from '../transformers/userTransformer.js'
 
 export async function getAppointments(req, res){
     //
@@ -70,5 +71,32 @@ export async function cancelAppointment(req, res){
     }catch(err){
         console.error(err);
         return res.status(500).json({ error: "Internal server error" });
+    }
+}
+
+export async function getMyAppointments(req, res){
+    try{
+        const user = req.user
+        if(!user){
+            res.status(400).json({message: 'user not found'})
+        }
+        if(user.role === 'doctor'){
+            const appointments = await Appointment.find({
+                'doctor': user.userId
+            }).populate('patient', 'name email')
+            .populate('doctor','name email')
+            res.status(200).json({data: appointments})
+        }
+        if(user.role === 'patient'){
+            const appointments = await Appointment.find({
+                'patient': user.userId
+            }).populate('doctor','name email')
+            .populate('patient', 'name email')
+            res.status(200).json({data: appointments})
+        }
+   
+    }catch(err){
+        console.log(err)
+        res.status(500).json({ error: "Internal server error" })
     }
 }

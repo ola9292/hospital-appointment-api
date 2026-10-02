@@ -8,13 +8,13 @@ export default async function(req, res, next){
         const appointment = await Appointment.findById(id)
 
         if(!appointment){
-            return res.status(404).json({msg: "appointment not found"})
+            return res.status(404).json({message: "appointment not found"})
         }
 
         if(appointment.patient.toString() === current_user_id){
             return next()
         }
-        return res.status(403).json({msg: "you are not authorized"})
+        return res.status(403).json({message: "you are not authorized"})
     }catch(err){
         console.log(err)
     }

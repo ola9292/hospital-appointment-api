@@ -1,55 +1,94 @@
 import User from '../db/models/User.js'
 import Appointment from '../db/models/Appointment.js'
 
-export default async function appointmentService(doctorId, requestedDateStr){
- 
+export default async function appointmentService(doctorId, requestedDateStr) {
+    // 1. Resolve target date and today's date
+    const now = new Date();
     const targetDate = requestedDateStr ? new Date(requestedDateStr) : new Date();
-    const dayOfTheWeek = targetDate.getDay()
-    const allSlots = appointmentTimes()
+    
+    const dayOfTheWeek = targetDate.getDay();
+    const allSlots = appointmentTimes();
+
     const year = targetDate.getFullYear();
-    const month = String(targetDate.getMonth() + 1).padStart(2, '0'); // Fixes 0-index bug
+    const month = String(targetDate.getMonth() + 1).padStart(2, '0');
     const day = String(targetDate.getDate()).padStart(2, '0');
     const formattedDate = `${year}-${month}-${day}`;
 
-      
-     console.log(dayOfTheWeek)
-    if(dayOfTheWeek == 0 || dayOfTheWeek == 6){
-        return []
+    // Format today's YYYY-MM-DD to compare against formattedDate
+    const todayYear = now.getFullYear();
+    const todayMonth = String(now.getMonth() + 1).padStart(2, '0');
+    const todayDay = String(now.getDate()).padStart(2, '0');
+    const todayFormatted = `${todayYear}-${todayMonth}-${todayDay}`;
+
+    // Weekend guard
+    if (dayOfTheWeek === 0 || dayOfTheWeek === 6) {
+        return [];
     }
 
+    // Past date guard: if requested date is strictly before today, return empty
+    if (formattedDate < todayFormatted) {
+        return [];
+    }
+
+    // Fetch existing bookings from DB
     const bookedAppointments = await Appointment.find({
-        'doctor' : doctorId,
+        'doctor': doctorId,
         'status': 'booked',
-        'date' : formattedDate
-    })
-     console.log(bookedAppointments)
-    const takenTimes = bookedAppointments.map((app) => app.time)
+        'date': formattedDate
+    });
 
-    
+    const takenTimes = bookedAppointments.map((app) => app.time);
 
-    const availableSlots = allSlots.filter((slot) => !takenTimes.includes(slot))
+    // Filter 1: Remove already booked slots
+    let availableSlots = allSlots.filter((slot) => !takenTimes.includes(slot));
 
-    return availableSlots
+    // 💡 NEW: Real-Time Guard (If checking for TODAY, remove past slots)
+    if (formattedDate === todayFormatted) {
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
 
+        availableSlots = availableSlots.filter((slot) => {
+            const slot24Hour = parseSlotTo24Hour(slot); // Convert "09:30 AM" -> { hour: 9, minute: 30 }
+            
+            if (slot24Hour.hour > currentHour) {
+                return true;
+            }
+            if (slot24Hour.hour === currentHour && slot24Hour.minute > currentMinute) {
+                return true;
+            }
+            return false;
+        });
+    }
+
+    return availableSlots;
 }
 
-function appointmentTimes(){
-    const appointmentArr = [];
+// Helper function to parse "09:30 AM" or "02:00 PM" into 24h numerical values
+function parseSlotTo24Hour(slotStr) {
+    const [time, ampm] = slotStr.split(' ');
+    let [hour, minute] = time.split(':').map(Number);
 
+    if (ampm === 'PM' && hour !== 12) {
+        hour += 12;
+    } else if (ampm === 'AM' && hour === 12) {
+        hour = 0;
+    }
+
+    return { hour, minute };
+}
+
+function appointmentTimes() {
+    const appointmentArr = [];
     const startTime = 9;  // 9 AM
     const endTime = 17;   // 5 PM (in 24-hour time)
 
     for (let hour = startTime; hour < endTime; hour++) {
-    // Convert 24h format to 12h format
-    const displayHour = hour > 12 ? hour - 12 : hour;
-    const ampm = hour >= 12 ? 'PM' : 'AM';
+        const displayHour = hour > 12 ? hour - 12 : hour;
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const hourStr = displayHour.toString().padStart(2, '0');
 
-    // Format hour with leading zero if needed (e.g., "09")
-    const hourStr = displayHour.toString().padStart(2, '0');
-
-    // Push 00 and 30 minute slots
-    appointmentArr.push(`${hourStr}:00 ${ampm}`);
-    appointmentArr.push(`${hourStr}:30 ${ampm}`);
+        appointmentArr.push(`${hourStr}:00 ${ampm}`);
+        appointmentArr.push(`${hourStr}:30 ${ampm}`);
     }
-    return appointmentArr
+    return appointmentArr;
 }

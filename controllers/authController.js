@@ -87,7 +87,7 @@ export async function checkLogin(req, res) {
 
       
         const token = jwt.sign(
-            { userId: user._id, is_admin: user.is_admin, name: user.name }, 
+            { userId: user._id, is_admin: user.is_admin, name: user.name, role:user.role }, 
             jwtSecret, 
             { expiresIn: '5h' }
         );
