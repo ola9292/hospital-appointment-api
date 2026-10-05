@@ -58,7 +58,7 @@ export async function bookAppointment(req, res){
         const message = `You have a doctor's appointment by ${time} on ${date}`
         const doctor_message = `You have been booked by ${req.user.name} at ${time} on ${date}`
         const user_email = req.user.email
-        if(bookedAppointment){
+        if(bookedAppointment){git
             //send email to client
             emailSender(user_email,'Booking Confirmed', message)
                 .catch(err => console.error("Background email failed:", err));
