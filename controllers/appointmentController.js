@@ -2,6 +2,7 @@ import User from '../db/models/User.js'
 import Appointment from '../db/models/Appointment.js'
 import appointmentService from '../services/appointmentService.js'
 import userTransformer from '../transformers/userTransformer.js'
+import { emailSender } from '../services/emailService.js'
 
 export async function getAppointments(req, res){
     //
@@ -41,7 +42,12 @@ export async function bookAppointment(req, res){
         if(existingBooking){
             return res.status(400).json({message: "booking exists already"})
         }
-    
+        
+        const doctor = await User.findById(doctorId);
+        if (!doctor) {
+            return res.status(404).json({ message: "Doctor not found" });
+        }
+
         const bookedAppointment = await Appointment.create({
             patient: user_id,
             doctor: doctorId,
@@ -49,8 +55,16 @@ export async function bookAppointment(req, res){
             time: time,
             date: date
         })
-        if(bookAppointment){
-            //send email
+        const message = `You have a doctor's appointment by ${time} on ${date}`
+        const doctor_message = `You have been booked by ${req.user.name} at ${time} on ${date}`
+        const user_email = req.user.email
+        if(bookedAppointment){
+            //send email to client
+            emailSender(user_email,'Booking Confirmed', message)
+                .catch(err => console.error("Background email failed:", err));
+            //send email to doctor
+            emailSender(doctor.email,'New Booking', doctor_message)
+                .catch(err => console.error("Background email failed:", err));
         }
         return res.status(201).json({message: "booking created successfully"})
     }catch(err){

@@ -10,8 +10,8 @@ export default async function(req, res, next){
         if(!appointment){
             return res.status(404).json({message: "appointment not found"})
         }
-
-        if(appointment.patient.toString() === current_user_id){
+        // console.log(req.user.role)
+        if(appointment.patient.toString() === current_user_id || req.user.role == "doctor"){
             return next()
         }
         return res.status(403).json({message: "you are not authorized"})
